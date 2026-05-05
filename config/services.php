@@ -13,7 +13,13 @@ return [
     | a conventional file to locate the various service credentials.
     |
     */
-
+    'pokeapi' => [
+        'base_url' => env('POKEAPI_BASE_URL', 'https://pokeapi.co/api/v2'),
+        'timeout' => (int) env('POKEAPI_TIMEOUT', 5),
+        'retry_times' => (int) env('POKEAPI_RETRY_TIMES', 2),
+        'retry_sleep_ms' => (int) env('POKEAPI_RETRY_SLEEP_MS', 200),
+        'cache_ttl_seconds' => (int) env('POKEMON_CACHE_TTL_SECONDS', 180),
+    ],
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
     ],
