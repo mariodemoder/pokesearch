@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\RateLimiter;
 use Tests\TestCase;
 
 class PokemonApiTest extends TestCase
@@ -112,5 +115,34 @@ class PokemonApiTest extends TestCase
         $second->assertOk();
 
         Http::assertSentCount(1);
+    }
+
+    public function test_rate_limit_returns_429_when_limit_is_exceeded(): void
+    {
+        RateLimiter::for('pokemon-api', function (Request $request) {
+            return Limit::perMinute(1)->by($request->ip());
+        });
+
+        Cache::flush();
+
+        Http::fake([
+            'https://pokeapi.co/api/v2/pokemon/squirtle' => Http::response([
+                'name' => 'squirtle',
+                'height' => 5,
+                'weight' => 90,
+                'sprites' => [
+                    'front_default' => 'https://img.example/squirtle.png',
+                ],
+                'types' => [
+                    ['type' => ['name' => 'water']],
+                ],
+            ], 200),
+        ]);
+
+        $first = $this->getJson('/api/pokemon/squirtle');
+        $second = $this->getJson('/api/pokemon/squirtle');
+
+        $first->assertOk();
+        $second->assertStatus(429);
     }
 }

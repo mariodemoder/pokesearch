@@ -7,6 +7,7 @@ use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class PokemonController extends Controller
 {
@@ -16,6 +17,12 @@ class PokemonController extends Controller
         $isValid = preg_match('/^[a-z0-9-]{1,50}$/', $normalizedName) === 1;
 
         if (! $isValid) {
+            Log::warning('pokemon_api.invalid_name', [
+                'name' => $name,
+                'normalized_name' => $normalizedName,
+                'ip' => request()->ip(),
+            ]);
+
             return response()->json([
                 'error' => 'Parametro name invalido. Usa letras, numeros o guion.',
             ], 422);
@@ -69,6 +76,12 @@ class PokemonController extends Controller
 
             return response()->json($data, 200);
         } catch (ConnectionException $e) {
+            Log::error('pokemon_api.upstream_timeout', [
+                'name' => $normalizedName,
+                'ip' => request()->ip(),
+                'message' => $e->getMessage(),
+            ]);
+
             report($e);
 
             return response()->json([
@@ -76,10 +89,22 @@ class PokemonController extends Controller
             ], 504);
         } catch (\RuntimeException $e) {
             if ($e->getMessage() === 'POKEMON_NOT_FOUND') {
+                Log::notice('pokemon_api.not_found', [
+                    'name' => $normalizedName,
+                    'ip' => request()->ip(),
+                ]);
+
                 return response()->json([
                     'error' => 'Pokemon no encontrado',
                 ], 404);
             }
+
+            Log::error('pokemon_api.upstream_error', [
+                'name' => $normalizedName,
+                'ip' => request()->ip(),
+                'message' => $e->getMessage(),
+                'previous_message' => $e->getPrevious()?->getMessage(),
+            ]);
 
             report($e);
 
@@ -87,6 +112,13 @@ class PokemonController extends Controller
                 'error' => 'Error al consultar el servicio externo.',
             ], 502);
         } catch (\Throwable $e) {
+            Log::critical('pokemon_api.unhandled_exception', [
+                'name' => $normalizedName,
+                'ip' => request()->ip(),
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+            ]);
+
             report($e);
 
             return response()->json([
