@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -57,18 +58,18 @@ class PokemonApiTest extends TestCase
         ]);
     }
 
-    public function test_timeout_returns_504(): void
+    public function test_upstream_error_returns_502(): void
     {
         Cache::flush();
 
-        Http::fake(function () {
-            throw new ConnectionException('Connection timed out');
-        });
+        Http::fake([
+            'https://pokeapi.co/api/v2/pokemon/raichu' => Http::response([], 500),
+        ]);
 
         $response = $this->getJson('/api/pokemon/raichu');
 
-        $response->assertStatus(504)->assertExactJson([
-            'error' => 'Servicio temporalmente no disponible.',
+        $response->assertStatus(502)->assertExactJson([
+            'error' => 'Error al consultar el servicio externo.',
         ]);
     }
 
